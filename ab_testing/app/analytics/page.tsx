@@ -207,7 +207,7 @@ export default function Analytics() {
     <div className="flex flex-col min-h-screen bg-black text-white font-sans">
       <Navbar />
       <main className="flex-grow p-6">
-        <h1 className="text-3xl font-bold mb-6">Component Analytics</h1>
+        <h1 className="text-3xl font-bold mb-6">Combination Analytics</h1>
         
         {loading ? (
           <div className="flex justify-center items-center h-64">
