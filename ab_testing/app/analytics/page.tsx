@@ -36,9 +36,11 @@ export default function Analytics() {
       pageleave: number;
       autocapture: number
      } }>({});
+  const [loading, setLoading] = useState(true);  // Loading state
 
   useEffect(() => {
     const fetchPosthogData = async () => {
+      setLoading(true);  // Set loading to true when data fetching starts
       const url = "https://us.posthog.com/api/projects/97054/events/";
 
       try {
@@ -144,8 +146,10 @@ export default function Analytics() {
 
           return updatedAnalytics;
         });
+        setLoading(false);  // Set loading to false when data is ready
       } catch (error) {
         console.error("Error fetching PostHog data:", error);
+        setLoading(false);  // In case of error, hide the loading
       }
     };
 
@@ -205,106 +209,115 @@ export default function Analytics() {
       <main className="flex-grow p-6">
         <h1 className="text-3xl font-bold mb-6">Component Analytics</h1>
         
-        <div className="flex flex-row bg-zinc-900 rounded-lg shadow-md p-6 mb-6">
-          {/* Left Column: Bar Chart */}
-          <div className="w-1/2 pr-3">
-            <h2 className="text-2xl font-bold mb-4">Interactions by Combination</h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={analytics}>
-                <XAxis 
-                  dataKey="name" 
-                  stroke="#ffffff" 
-                  tick={false}
-                />
-                <YAxis stroke="#ffffff" />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="interactions">
-                  {analytics.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill="#8884d8" />
+        {loading ? (
+          <div className="flex justify-center items-center h-64">
+            {/* You can replace this with any loading spinner */}
+            <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500 border-solid"></div>
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-row bg-zinc-900 rounded-lg shadow-md p-6 mb-6">
+              {/* Left Column: Bar Chart */}
+              <div className="w-1/2 pr-3">
+                <h2 className="text-2xl font-bold mb-4">Interactions by Combination</h2>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={analytics}>
+                    <XAxis 
+                      dataKey="name" 
+                      stroke="#ffffff" 
+                      tick={false}
+                    />
+                    <YAxis stroke="#ffffff" />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="interactions">
+                      {analytics.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill="#8884d8" />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Right Column: Pie Charts */}
+              <div className="w-1/2 pl-3 flex flex-col justify-between">
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold mb-4">Page Views Distribution</h2>
+                  <ResponsiveContainer width="100%" height={150}>
+                    <PieChart>
+                    <Pie
+                        data={analytics}
+                        dataKey="Pageviews"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={50}
+                        fill="#82ca9d"
+                        label
+                    />
+                      <Tooltip content={<CustomPieTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <div>
+                  <h2 className="text-2xl font-bold mb-4">Page Leaves Distribution</h2>
+                  <ResponsiveContainer width="100%" height={150}>
+                    <PieChart>
+                    <Pie
+                        data={analytics}
+                        dataKey="Pageleaves"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={50}
+                        fill="#8884d8"
+                        label
+                    />
+                      <Tooltip content={<CustomPieTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+
+            {/* Existing Table */}
+            <div className="bg-zinc-900 rounded-lg shadow-md p-6">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-b border-zinc-800">
+                    <TableHead className="text-zinc-300">Combination Name</TableHead>
+                    <TableHead className="text-zinc-300">Interactions</TableHead>
+                    <TableHead className="text-zinc-300">Pageviews</TableHead>
+                    <TableHead className="text-zinc-300">Pageleaves</TableHead>
+                    <TableHead className="text-zinc-300">Dynamic Element Hits</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {analytics.map((component) => (
+                    <TableRow
+                      key={component.id}
+                      className="border-b border-zinc-800"
+                    >
+                      <TableCell className="text-white">{component.name}</TableCell>
+                      <TableCell className="text-white">
+                        {component.interactions}
+                      </TableCell>
+                      <TableCell className="text-white">
+                        {component.Pageviews}
+                      </TableCell>
+                      <TableCell className="text-white">
+                        {component.Pageleaves}
+                      </TableCell>
+                      <TableCell className="text-white">
+                        {component.AutoCapture}
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Right Column: Pie Charts */}
-          <div className="w-1/2 pl-3 flex flex-col justify-between">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold mb-4">Page Views Distribution</h2>
-              <ResponsiveContainer width="100%" height={150}>
-                <PieChart>
-                <Pie
-                    data={analytics}
-                    dataKey="Pageviews"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={50} // Increased from 50 to 70
-                    fill="#82ca9d"
-                    label
-                />
-                  <Tooltip content={<CustomPieTooltip />} />
-                </PieChart>
-              </ResponsiveContainer>
+                </TableBody>
+              </Table>
             </div>
-
-            <div>
-              <h2 className="text-2xl font-bold mb-4">Page Leaves Distribution</h2>
-              <ResponsiveContainer width="100%" height={150}>
-                <PieChart>
-                <Pie
-                    data={analytics}
-                    dataKey="Pageleaves"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={50} // Increased from 50 to 70
-                    fill="#8884d8"
-                    label
-                />
-                  <Tooltip content={<CustomPieTooltip />} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-
-        {/* Existing Table */}
-        <div className="bg-zinc-900 rounded-lg shadow-md p-6">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-b border-zinc-800">
-                <TableHead className="text-zinc-300">Combination Name</TableHead>
-                <TableHead className="text-zinc-300">Interactions</TableHead>
-                <TableHead className="text-zinc-300">Pageviews</TableHead>
-                <TableHead className="text-zinc-300">Pageleaves</TableHead>
-                <TableHead className="text-zinc-300">Dynamic Element Hits</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {analytics.map((component) => (
-                <TableRow
-                  key={component.id}
-                  className="border-b border-zinc-800"
-                >
-                  <TableCell className="text-white">{component.name}</TableCell>
-                  <TableCell className="text-white">
-                    {component.interactions}
-                  </TableCell>
-                  <TableCell className="text-white">
-                    {component.Pageviews}
-                  </TableCell>
-                  <TableCell className="text-white">
-                    {component.Pageleaves}
-                  </TableCell>
-                  <TableCell className="text-white">
-                    {component.AutoCapture}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+          </>
+        )}
       </main>
     </div>
   );
