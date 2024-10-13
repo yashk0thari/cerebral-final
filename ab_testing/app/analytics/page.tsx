@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import * as shadcn from "@/components/ui";
 import Navbar from "@/components/ui/navbar";
 import { db } from "@/app/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie } from 'recharts';
 
 import {
@@ -37,10 +37,13 @@ export default function Analytics() {
       autocapture: number
      } }>({});
   const [loading, setLoading] = useState(true);  // Loading state
+  const [keysList, setKeysList] = useState<string[]>([]); // List of keys
+  const [totalKeys, setTotalKeys] = useState<number>(0);  // Total count of keys
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false); // Dropdown state
 
   useEffect(() => {
     const fetchPosthogData = async () => {
-      setLoading(true);  // Set loading to true when data fetching starts
+      setLoading(true);
       const url = "https://us.posthog.com/api/projects/97054/events/";
 
       try {
@@ -108,7 +111,6 @@ export default function Analytics() {
                 newCombinationCounts[combinationID].autocapture++;
               }
 
-              // Calculate interactions as the sum of all events
               newCombinationCounts[combinationID].interactions =
                 newCombinationCounts[combinationID].pageview +
                 newCombinationCounts[combinationID].web_vitals +
@@ -146,61 +148,57 @@ export default function Analytics() {
 
           return updatedAnalytics;
         });
-        setLoading(false);  // Set loading to false when data is ready
+        setLoading(false);
       } catch (error) {
         console.error("Error fetching PostHog data:", error);
-        setLoading(false);  // In case of error, hide the loading
+        setLoading(false);
       }
     };
 
+    const fetchDeveloperData = async () => {
+      try {
+        const developerDocRef = doc(db, "developer", "zjLHwJHVUHxNsyxFK0tX");
+        const developerDocSnap = await getDoc(developerDocRef);
+    
+        if (!developerDocSnap.exists()) {
+          throw new Error("Developer document does not exist");
+        }
+    
+        const developerData = developerDocSnap.data();
+        console.log("Developer Data:", developerData);
+    
+        const newKeysData: string[] = [];
+    
+        const keysCollectionRef = collection(db, "developer", "zjLHwJHVUHxNsyxFK0tX", "keys");
+        const keysSnapshot = await getDocs(keysCollectionRef);
+    
+        keysSnapshot.forEach((doc) => {
+          const keyID = doc.id;
+          const keyData = doc.data();
+    
+          // If the document ID contains a '-', the key is stored in the document ID
+          if (keyID.includes('-')) {
+            newKeysData.push(keyID);
+          } else if (keyData.key) {
+            // Otherwise, the key is stored in the 'key' field
+            newKeysData.push(keyData.key);
+          }
+        });
+    
+        console.log("Keys Data:", newKeysData);
+        setKeysList(newKeysData);
+        setTotalKeys(newKeysData.length);
+      } catch (error) {
+        console.error("Error fetching developer data:", error);
+      }
+    };
+    
+    fetchDeveloperData();
     fetchPosthogData();
   }, []);
 
-  const truncateText = (text: string, maxLength: number) => {
-    return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
-  };
-
-  const CustomXAxisTick = (props: any) => {
-    const { x, y, payload } = props;
-    return (
-      <g transform={`translate(${x},${y})`}>
-        <text 
-          x={0} 
-          y={0} 
-          dy={16} 
-          textAnchor="middle" 
-          fill="#ffffff" 
-          fontSize={12}
-        >
-          {truncateText(payload.value, 10)}
-        </text>
-      </g>
-    );
-  };
-
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-zinc-800 p-2 rounded shadow">
-          <p className="text-white">{`${label}`}</p>
-          <p className="text-white">{`Interactions: ${payload[0].value}`}</p>
-        </div>
-      );
-    }
-    return null;
-  };
-
-  // Custom tooltip for pie charts
-  const CustomPieTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-zinc-800 p-2 rounded shadow">
-          <p className="text-white">{`Combination: ${payload[0].name}`}</p>
-          <p className="text-white">{`Value: ${payload[0].value}`}</p>
-        </div>
-      );
-    }
-    return null;
+  const toggleDropdown = () => {
+    setIsDropdownOpen(!isDropdownOpen);
   };
 
   return (
@@ -211,24 +209,44 @@ export default function Analytics() {
         
         {loading ? (
           <div className="flex justify-center items-center h-64">
-            {/* You can replace this with any loading spinner */}
             <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-500 border-solid"></div>
           </div>
         ) : (
           <>
+            {/* Keys Block */}
+            <div className="bg-zinc-900 p-4 rounded-lg shadow-md mb-6">
+              <h2 className="text-2xl font-bold mb-4">Your Total Keys: {totalKeys}</h2>
+              <button
+                onClick={toggleDropdown}
+                className="bg-blue-600 text-white px-4 py-2 rounded-md"
+              >
+                {isDropdownOpen ? 'Hide Keys' : 'Show Keys'}
+              </button>
+
+              {isDropdownOpen && (
+                <ul className="mt-4 bg-zinc-800 p-4 rounded-lg max-h-48 overflow-y-auto">
+                  {keysList.length > 0 ? (
+                    keysList.map((key, index) => (
+                      <li key={index} className="text-white mb-2">
+                        {key}
+                      </li>
+                    ))
+                  ) : (
+                    <li className="text-white">No keys available</li>
+                  )}
+                </ul>
+              )}
+            </div>
+
+            {/* Rest of the Analytics */}
             <div className="flex flex-row bg-zinc-900 rounded-lg shadow-md p-6 mb-6">
-              {/* Left Column: Bar Chart */}
               <div className="w-1/2 pr-3">
                 <h2 className="text-2xl font-bold mb-4">Interactions by Combination</h2>
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={analytics}>
-                    <XAxis 
-                      dataKey="name" 
-                      stroke="#ffffff" 
-                      tick={false}
-                    />
+                    <XAxis dataKey="name" stroke="#ffffff" tick={false} />
                     <YAxis stroke="#ffffff" />
-                    <Tooltip content={<CustomTooltip />} />
+                    <Tooltip contentStyle={{ color: 'black' }} />
                     <Bar dataKey="interactions">
                       {analytics.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill="#8884d8" />
@@ -238,13 +256,12 @@ export default function Analytics() {
                 </ResponsiveContainer>
               </div>
 
-              {/* Right Column: Pie Charts */}
               <div className="w-1/2 pl-3 flex flex-col justify-between">
                 <div className="mb-6">
                   <h2 className="text-2xl font-bold mb-4">Page Views Distribution</h2>
                   <ResponsiveContainer width="100%" height={150}>
                     <PieChart>
-                    <Pie
+                      <Pie
                         data={analytics}
                         dataKey="Pageviews"
                         nameKey="name"
@@ -253,8 +270,8 @@ export default function Analytics() {
                         outerRadius={50}
                         fill="#82ca9d"
                         label
-                    />
-                      <Tooltip content={<CustomPieTooltip />} />
+                      />
+                      <Tooltip />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -263,7 +280,7 @@ export default function Analytics() {
                   <h2 className="text-2xl font-bold mb-4">Page Leaves Distribution</h2>
                   <ResponsiveContainer width="100%" height={150}>
                     <PieChart>
-                    <Pie
+                      <Pie
                         data={analytics}
                         dataKey="Pageleaves"
                         nameKey="name"
@@ -272,15 +289,14 @@ export default function Analytics() {
                         outerRadius={50}
                         fill="#8884d8"
                         label
-                    />
-                      <Tooltip content={<CustomPieTooltip />} />
+                      />
+                      <Tooltip />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
               </div>
             </div>
 
-            {/* Existing Table */}
             <div className="bg-zinc-900 rounded-lg shadow-md p-6">
               <Table>
                 <TableHeader>
@@ -294,23 +310,12 @@ export default function Analytics() {
                 </TableHeader>
                 <TableBody>
                   {analytics.map((component) => (
-                    <TableRow
-                      key={component.id}
-                      className="border-b border-zinc-800"
-                    >
+                    <TableRow key={component.id} className="border-b border-zinc-800">
                       <TableCell className="text-white">{component.name}</TableCell>
-                      <TableCell className="text-white">
-                        {component.interactions}
-                      </TableCell>
-                      <TableCell className="text-white">
-                        {component.Pageviews}
-                      </TableCell>
-                      <TableCell className="text-white">
-                        {component.Pageleaves}
-                      </TableCell>
-                      <TableCell className="text-white">
-                        {component.AutoCapture}
-                      </TableCell>
+                      <TableCell className="text-white">{component.interactions}</TableCell>
+                      <TableCell className="text-white">{component.Pageviews}</TableCell>
+                      <TableCell className="text-white">{component.Pageleaves}</TableCell>
+                      <TableCell className="text-white">{component.AutoCapture}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
